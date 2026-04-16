@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "포장 칩 판별"
+version = "1.0.0"
+id = "artifacts/chip-scanner"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25948
+
+[services.development]
+run = "pnpm --filter @workspace/chip-scanner run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/chip-scanner", "run", "build" ]
+publicDir = "artifacts/chip-scanner/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25948"
+BASE_PATH = "/"
