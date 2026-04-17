@@ -40,6 +40,13 @@ export const MAX_MOTION = 14; // 평균 픽셀 차이
 export const STABLE_FRAMES_REQUIRED = 6; // 약 1초 (간격 약 160ms)
 export const FRAME_INTERVAL_MS = 160;
 
+// 칩(지시계) 인식 조건 — 실시간 미리보기와 분석에서 공유
+// 단일색 표준편차: 값이 낮을수록 균일한 색. 일반 사물(병, 종이 등)이
+// 통과할 수 있도록 약간 완화. 너무 큰 값은 잡색 사물도 통과시키므로 주의.
+export const PREVIEW_MAX_COLOR_STD = 55;
+// HSV 채도: 너무 낮으면 무채색(검정/회색/흰색) → 지시계 아님
+export const PREVIEW_MIN_SATURATION = 0.15;
+
 // API
 export const API_BASE_URL: string =
   (import.meta.env.VITE_API_URL as string | undefined) ?? "";

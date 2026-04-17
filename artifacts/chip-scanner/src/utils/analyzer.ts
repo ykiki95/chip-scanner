@@ -1,4 +1,10 @@
-import { RESULT_DISPLAY, type PredictionResult, type PredictionLabel } from "./constants";
+import {
+  RESULT_DISPLAY,
+  PREVIEW_MAX_COLOR_STD,
+  PREVIEW_MIN_SATURATION,
+  type PredictionResult,
+  type PredictionLabel,
+} from "./constants";
 
 // 문서 기준 RGB 임계값
 // - pH 지시계 (신선):     R[160,219]  G[34,136]   B[53,74]
@@ -21,11 +27,9 @@ export const SULFUR_OK_RANGE: RgbRange = {
   b: [57, 102],
 };
 
-// 지시계 유효성 검증 임계값
-// - 지시계는 단일색에 가까워야 함 → 색상 표준편차가 낮아야 함
-// - 지시계는 채도가 어느 정도 있어야 함 (회색/흰 종이 등 거부)
-const MAX_COLOR_STD = 38; // RGB 채널별 표준편차 평균이 이 값 이하여야 균일한 색
-const MIN_SATURATION = 0.18; // HSV 채도 (0~1). 너무 낮으면 무채색 = 지시계 아님
+// 지시계 유효성 검증 임계값 — 미리보기와 동일 기준 사용
+const MAX_COLOR_STD = PREVIEW_MAX_COLOR_STD;
+const MIN_SATURATION = PREVIEW_MIN_SATURATION;
 
 export interface RgbStats {
   r: number;

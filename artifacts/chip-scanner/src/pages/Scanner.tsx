@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
-import CameraView from "@/components/CameraView";
-import ResultView from "@/components/ResultView";
+import CameraView, { type FrameDiagnostics } from "@/components/CameraView";
+import ResultView, { type ResultMeasurement } from "@/components/ResultView";
 import { analyzeBlob } from "@/utils/analyzer";
 import type { PredictionResult } from "@/utils/constants";
 
@@ -9,10 +9,12 @@ type Phase = "camera" | "result" | "exited";
 export default function Scanner() {
   const [phase, setPhase] = useState<Phase>("camera");
   const [result, setResult] = useState<PredictionResult | null>(null);
+  const [measurement, setMeasurement] = useState<ResultMeasurement | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
-  const handleCapture = useCallback(async (blob: Blob) => {
+  const handleCapture = useCallback(
+    async (blob: Blob, diag: FrameDiagnostics | null) => {
     setIsAnalyzing(true);
     setErrorBanner(null);
     try {
@@ -23,6 +25,17 @@ export default function Scanner() {
         new Promise((resolve) => setTimeout(resolve, 350)),
       ]);
       setResult(r);
+      setMeasurement(
+        diag
+          ? {
+              r: diag.r,
+              g: diag.g,
+              b: diag.b,
+              saturation: diag.saturation,
+              colorStd: diag.colorStd,
+            }
+          : { r: r.rgb.r, g: r.rgb.g, b: r.rgb.b, saturation: r.rgb.saturation, colorStd: (r.rgb.stdR + r.rgb.stdG + r.rgb.stdB) / 3 },
+      );
       setPhase("result");
     } catch (err) {
       const msg =
@@ -39,6 +52,7 @@ export default function Scanner() {
 
   const handleRetry = useCallback(() => {
     setResult(null);
+    setMeasurement(null);
     setErrorBanner(null);
     setIsAnalyzing(false);
     setPhase("camera");
@@ -104,6 +118,7 @@ export default function Scanner() {
     return (
       <ResultView
         result={result}
+        measurement={measurement}
         onRetry={handleRetry}
         onExit={handleExit}
       />

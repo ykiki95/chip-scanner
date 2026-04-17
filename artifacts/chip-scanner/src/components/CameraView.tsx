@@ -9,18 +9,34 @@ import {
   MAX_MOTION,
   STABLE_FRAMES_REQUIRED,
   FRAME_INTERVAL_MS,
+  PREVIEW_MAX_COLOR_STD,
+  PREVIEW_MIN_SATURATION,
 } from "@/utils/constants";
 import { computeQuality, computeMotion } from "@/utils/imageQuality";
 import { meanRgb } from "@/utils/analyzer";
 
 type RoiState = "idle" | "scanning" | "detected" | "stable" | "analyzing";
 
-// 칩으로 인정할 색상 균일도/채도 임계값 (analyzer.ts 와 동일 컨셉)
-const PREVIEW_MAX_COLOR_STD = 42;
-const PREVIEW_MIN_SATURATION = 0.16;
+export interface FrameDiagnostics {
+  r: number;
+  g: number;
+  b: number;
+  saturation: number;
+  colorStd: number;
+  brightness: number;
+  sharpness: number;
+  motion: number;
+  checks: {
+    brightness: boolean;
+    sharpness: boolean;
+    stability: boolean;
+    uniformity: boolean;
+    saturation: boolean;
+  };
+}
 
 interface Props {
-  onCapture: (blob: Blob) => void;
+  onCapture: (blob: Blob, diagnostics: FrameDiagnostics | null) => void;
   isAnalyzing: boolean;
   errorBanner?: string | null;
 }
@@ -43,6 +59,9 @@ export default function CameraView({
   );
   const [lowLight, setLowLight] = useState(false);
   const [stableProgress, setStableProgress] = useState(0); // 0 ~ 1
+  const [diagnostics, setDiagnostics] = useState<FrameDiagnostics | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(true);
+  const lastDiagnosticsRef = useRef<FrameDiagnostics | null>(null);
 
   // mount: 카메라 시작
   useEffect(() => {
@@ -142,9 +161,29 @@ export default function CameraView({
       // 칩 색상 유효성 (균일색 + 채도)
       const rgb = meanRgb(imageData);
       const avgStd = (rgb.stdR + rgb.stdG + rgb.stdB) / 3;
-      const looksLikeChip =
-        avgStd <= PREVIEW_MAX_COLOR_STD &&
-        rgb.saturation >= PREVIEW_MIN_SATURATION;
+      const uniformOk = avgStd <= PREVIEW_MAX_COLOR_STD;
+      const saturationOk = rgb.saturation >= PREVIEW_MIN_SATURATION;
+      const looksLikeChip = uniformOk && saturationOk;
+
+      const diag: FrameDiagnostics = {
+        r: rgb.r,
+        g: rgb.g,
+        b: rgb.b,
+        saturation: rgb.saturation,
+        colorStd: avgStd,
+        brightness,
+        sharpness,
+        motion,
+        checks: {
+          brightness: !tooDark && !tooBright,
+          sharpness: !tooBlurry,
+          stability: !tooMoving,
+          uniformity: uniformOk,
+          saturation: saturationOk,
+        },
+      };
+      lastDiagnosticsRef.current = diag;
+      setDiagnostics(diag);
 
       const resetStable = () => {
         stableCountRef.current = 0;
@@ -216,7 +255,7 @@ export default function CameraView({
       );
       cap.toBlob(
         (blob) => {
-          if (blob) onCapture(blob);
+          if (blob) onCapture(blob, lastDiagnosticsRef.current);
           else lockedRef.current = false;
         },
         "image/jpeg",
@@ -346,6 +385,22 @@ export default function CameraView({
         </div>
       </div>
 
+      {/* 진단 패널 토글 버튼 */}
+      {status === "ready" && (
+        <button
+          onClick={() => setShowDiagnostics((v) => !v)}
+          className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-10 px-2.5 py-1 rounded-full bg-black/55 backdrop-blur-sm text-white/90 text-[11px] font-medium border border-white/15 hover-elevate active-elevate-2"
+          aria-label="기준 보기 토글"
+        >
+          기준 {showDiagnostics ? "끄기" : "보기"}
+        </button>
+      )}
+
+      {/* 진단 패널 */}
+      {showDiagnostics && diagnostics && status === "ready" && (
+        <DiagnosticsPanel d={diagnostics} />
+      )}
+
       {/* 권한 거부 / 오류 오버레이 */}
       {(status === "denied" || status === "error") && (
         <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center px-6 text-center">
@@ -387,6 +442,60 @@ export default function CameraView({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function DiagnosticsPanel({ d }: { d: FrameDiagnostics }) {
+  const fmt = (n: number, p = 0) => n.toFixed(p);
+  const Check = ({ ok, label }: { ok: boolean; label: string }) => (
+    <span
+      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-medium ${
+        ok
+          ? "bg-emerald-500/25 text-emerald-200"
+          : "bg-rose-500/25 text-rose-200"
+      }`}
+    >
+      <span>{ok ? "✓" : "✗"}</span>
+      <span>{label}</span>
+    </span>
+  );
+  const swatch = `rgb(${Math.round(d.r)}, ${Math.round(d.g)}, ${Math.round(d.b)})`;
+  return (
+    <div
+      className="absolute left-3 right-3 z-10 pointer-events-none"
+      style={{
+        bottom: "calc(env(safe-area-inset-bottom) + 7.5rem)",
+      }}
+    >
+      <div className="mx-auto max-w-md rounded-xl bg-black/60 backdrop-blur-sm border border-white/10 px-3 py-2 text-white shadow-lg">
+        <div className="flex items-center gap-2 mb-1.5">
+          <span
+            className="inline-block w-5 h-5 rounded border border-white/30"
+            style={{ backgroundColor: swatch }}
+            aria-hidden
+          />
+          <span className="text-[11px] font-mono">
+            R {fmt(d.r)} · G {fmt(d.g)} · B {fmt(d.b)}
+          </span>
+          <span className="ml-auto text-[10px] text-white/70 font-mono">
+            채도 {d.saturation.toFixed(2)} · σ {fmt(d.colorStd, 1)}
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          <Check ok={d.checks.brightness} label="밝기" />
+          <Check ok={d.checks.sharpness} label="선명도" />
+          <Check ok={d.checks.stability} label="안정성" />
+          <Check
+            ok={d.checks.uniformity}
+            label={`단일색${d.checks.uniformity ? "" : `(σ=${fmt(d.colorStd, 0)})`}`}
+          />
+          <Check
+            ok={d.checks.saturation}
+            label={`채도${d.checks.saturation ? "" : `(${d.saturation.toFixed(2)})`}`}
+          />
+        </div>
+      </div>
     </div>
   );
 }

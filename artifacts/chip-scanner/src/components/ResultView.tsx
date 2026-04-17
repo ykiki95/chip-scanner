@@ -1,7 +1,16 @@
 import { RESULT_DISPLAY, type PredictionResult } from "@/utils/constants";
 
+export interface ResultMeasurement {
+  r: number;
+  g: number;
+  b: number;
+  saturation: number;
+  colorStd: number;
+}
+
 interface Props {
   result: PredictionResult;
+  measurement?: ResultMeasurement | null;
   onRetry: () => void;
   onExit: () => void;
 }
@@ -72,7 +81,7 @@ const TONE_STYLES = {
   },
 } as const;
 
-export default function ResultView({ result, onRetry, onExit }: Props) {
+export default function ResultView({ result, measurement, onRetry, onExit }: Props) {
   const display = RESULT_DISPLAY[result.label] ?? RESULT_DISPLAY.consumable;
   const style = TONE_STYLES[display.tone];
   const confidencePct = Math.round((result.confidence ?? 0) * 100);
@@ -110,6 +119,24 @@ export default function ResultView({ result, onRetry, onExit }: Props) {
         <p className="max-w-sm text-foreground/70 text-sm leading-relaxed">
           {result.reason || display.reason}
         </p>
+
+        {measurement && (
+          <div className="mt-5 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/70 border border-border/60">
+            <span
+              className="inline-block w-4 h-4 rounded border border-border/60"
+              style={{
+                backgroundColor: `rgb(${Math.round(measurement.r)}, ${Math.round(
+                  measurement.g,
+                )}, ${Math.round(measurement.b)})`,
+              }}
+              aria-hidden
+            />
+            <span className="text-[11px] font-mono text-foreground/70">
+              R {measurement.r.toFixed(0)} · G {measurement.g.toFixed(0)} · B{" "}
+              {measurement.b.toFixed(0)} · 채도 {measurement.saturation.toFixed(2)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* 하단 버튼 */}
