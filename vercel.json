@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "corepack enable && pnpm install --no-frozen-lockfile --config.minimum-release-age=0",
+  "buildCommand": "pnpm --filter @workspace/chip-scanner build",
+  "outputDirectory": "artifacts/chip-scanner/dist/public",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
