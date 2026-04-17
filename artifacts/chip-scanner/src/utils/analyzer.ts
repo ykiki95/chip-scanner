@@ -21,21 +21,32 @@ export const SULFUR_OK_RANGE: RgbRange = {
   b: [57, 102],
 };
 
+// 지시계 유효성 검증 임계값
+// - 지시계는 단일색에 가까워야 함 → 색상 표준편차가 낮아야 함
+// - 지시계는 채도가 어느 정도 있어야 함 (회색/흰 종이 등 거부)
+const MAX_COLOR_STD = 38; // RGB 채널별 표준편차 평균이 이 값 이하여야 균일한 색
+const MIN_SATURATION = 0.18; // HSV 채도 (0~1). 너무 낮으면 무채색 = 지시계 아님
+
 export interface RgbStats {
   r: number;
   g: number;
   b: number;
+  stdR: number;
+  stdG: number;
+  stdB: number;
+  saturation: number;
 }
 
 export function meanRgb(imageData: ImageData): RgbStats {
-  const { data } = imageData;
+  const { data, width: w, height: h } = imageData;
   let r = 0;
   let g = 0;
   let b = 0;
+  let r2 = 0;
+  let g2 = 0;
+  let b2 = 0;
   let n = 0;
   // 중앙 60% 영역만 사용해서 가이드 박스 가장자리/배경 영향 최소화
-  const w = imageData.width;
-  const h = imageData.height;
   const x0 = Math.floor(w * 0.2);
   const x1 = Math.floor(w * 0.8);
   const y0 = Math.floor(h * 0.2);
@@ -43,17 +54,30 @@ export function meanRgb(imageData: ImageData): RgbStats {
   for (let y = y0; y < y1; y += 2) {
     for (let x = x0; x < x1; x += 2) {
       const i = (y * w + x) * 4;
-      r += data[i];
-      g += data[i + 1];
-      b += data[i + 2];
+      const cr = data[i];
+      const cg = data[i + 1];
+      const cb = data[i + 2];
+      r += cr;
+      g += cg;
+      b += cb;
+      r2 += cr * cr;
+      g2 += cg * cg;
+      b2 += cb * cb;
       n++;
     }
   }
-  return {
-    r: r / Math.max(1, n),
-    g: g / Math.max(1, n),
-    b: b / Math.max(1, n),
-  };
+  const N = Math.max(1, n);
+  const mr = r / N;
+  const mg = g / N;
+  const mb = b / N;
+  const stdR = Math.sqrt(Math.max(0, r2 / N - mr * mr));
+  const stdG = Math.sqrt(Math.max(0, g2 / N - mg * mg));
+  const stdB = Math.sqrt(Math.max(0, b2 / N - mb * mb));
+  // HSV 채도
+  const max = Math.max(mr, mg, mb);
+  const min = Math.min(mr, mg, mb);
+  const saturation = max === 0 ? 0 : (max - min) / max;
+  return { r: mr, g: mg, b: mb, stdR, stdG, stdB, saturation };
 }
 
 function inRange(v: number, range: [number, number]): boolean {
@@ -61,7 +85,6 @@ function inRange(v: number, range: [number, number]): boolean {
 }
 
 function rangeDistance(stats: RgbStats, range: RgbRange): number {
-  // 범위 안이면 0, 밖이면 가장 가까운 경계까지의 거리(L1)
   const dr = inRange(stats.r, range.r)
     ? 0
     : Math.min(Math.abs(stats.r - range.r[0]), Math.abs(stats.r - range.r[1]));
@@ -87,34 +110,46 @@ export interface AnalysisResult extends PredictionResult {
 }
 
 export function classifyByRgb(stats: RgbStats): AnalysisResult {
-  const isFresh = inRgbRange(stats, PH_FRESH_RANGE);
-  const isOk = inRgbRange(stats, SULFUR_OK_RANGE);
+  const avgStd = (stats.stdR + stats.stdG + stats.stdB) / 3;
+  const isUniform = avgStd <= MAX_COLOR_STD;
+  const isSaturated = stats.saturation >= MIN_SATURATION;
+  const looksLikeChip = isUniform && isSaturated;
 
   let label: PredictionLabel;
   let confidence: number;
+  let reasonOverride: string | null = null;
 
-  if (isFresh) {
+  if (looksLikeChip && inRgbRange(stats, PH_FRESH_RANGE)) {
     label = "very_fresh";
-    // 범위 중심에 가까울수록 신뢰도 ↑
     confidence = confidenceFromCenter(stats, PH_FRESH_RANGE);
-  } else if (isOk) {
+  } else if (looksLikeChip && inRgbRange(stats, SULFUR_OK_RANGE)) {
     label = "consumable";
     confidence = confidenceFromCenter(stats, SULFUR_OK_RANGE);
   } else {
     label = "not_recommended";
-    // 두 범위로부터의 거리 중 가까운 쪽을 기준으로 신뢰도 산정
-    const dFresh = rangeDistance(stats, PH_FRESH_RANGE);
-    const dOk = rangeDistance(stats, SULFUR_OK_RANGE);
-    const minD = Math.min(dFresh, dOk);
-    // 거리 0 → 0.5, 거리 200+ → 0.99 로 부드럽게 매핑
-    confidence = Math.min(0.99, 0.5 + minD / 400);
+    if (!isUniform) {
+      reasonOverride =
+        "지시계가 아닌 다른 사물이 감지되었습니다. 단일 색상의 지시계만 인식 가능합니다.";
+      confidence = 0.95;
+    } else if (!isSaturated) {
+      reasonOverride =
+        "지시계 색상이 인식되지 않았습니다 (무채색/회색 영역). 지시계를 가이드 박스 안에 정확히 맞춰 주세요.";
+      confidence = 0.9;
+    } else {
+      // 색은 지시계 같은 균일색이지만 두 범위에 모두 안 들어감 → 변질 가능성
+      const dFresh = rangeDistance(stats, PH_FRESH_RANGE);
+      const dOk = rangeDistance(stats, SULFUR_OK_RANGE);
+      const minD = Math.min(dFresh, dOk);
+      // 가까울수록 신뢰도 약간 ↓ (경계 근처는 애매), 멀수록 명확히 변질
+      confidence = Math.min(0.99, 0.7 + minD / 250);
+    }
   }
 
   const display = RESULT_DISPLAY[label];
   return {
     label,
     display_text: display.text,
-    reason: display.reason,
+    reason: reasonOverride ?? display.reason,
     confidence,
     rgb: stats,
   };
@@ -127,13 +162,11 @@ function confidenceFromCenter(stats: RgbStats, range: RgbRange): number {
   const hr = (range.r[1] - range.r[0]) / 2 || 1;
   const hg = (range.g[1] - range.g[0]) / 2 || 1;
   const hb = (range.b[1] - range.b[0]) / 2 || 1;
-  // 정규화된 거리 (0 = 정중앙, 1 = 경계)
   const nd =
     (Math.abs(stats.r - cr) / hr +
       Math.abs(stats.g - cg) / hg +
       Math.abs(stats.b - cb) / hb) /
     3;
-  // 정중앙 0.99, 경계 0.7
   return Math.max(0.7, 0.99 - nd * 0.29);
 }
 
