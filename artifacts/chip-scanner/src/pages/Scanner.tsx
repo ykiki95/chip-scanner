@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import CameraView from "@/components/CameraView";
 import ResultView from "@/components/ResultView";
-import { predictChip } from "@/utils/api";
+import { analyzeBlob } from "@/utils/analyzer";
 import type { PredictionResult } from "@/utils/constants";
 
 type Phase = "camera" | "result" | "exited";
@@ -16,7 +16,12 @@ export default function Scanner() {
     setIsAnalyzing(true);
     setErrorBanner(null);
     try {
-      const r = await predictChip(blob);
+      // RGB 임계값 기반 분류 (브라우저에서 바로 분석)
+      // 분석 자체는 매우 빠르지만, UX 상 잠시 로딩이 보이도록 최소 350ms 보장
+      const [r] = await Promise.all([
+        analyzeBlob(blob),
+        new Promise((resolve) => setTimeout(resolve, 350)),
+      ]);
       setResult(r);
       setPhase("result");
     } catch (err) {
