@@ -11,8 +11,13 @@ import {
   FRAME_INTERVAL_MS,
 } from "@/utils/constants";
 import { computeQuality, computeMotion } from "@/utils/imageQuality";
+import { meanRgb } from "@/utils/analyzer";
 
-type RoiState = "idle" | "scanning" | "stable" | "analyzing";
+type RoiState = "idle" | "scanning" | "detected" | "stable" | "analyzing";
+
+// 칩으로 인정할 색상 균일도/채도 임계값 (analyzer.ts 와 동일 컨셉)
+const PREVIEW_MAX_COLOR_STD = 42;
+const PREVIEW_MIN_SATURATION = 0.16;
 
 interface Props {
   onCapture: (blob: Blob) => void;
@@ -37,6 +42,7 @@ export default function CameraView({
     "칩을 가이드 영역 안에 맞춰 주세요",
   );
   const [lowLight, setLowLight] = useState(false);
+  const [stableProgress, setStableProgress] = useState(0); // 0 ~ 1
 
   // mount: 카메라 시작
   useEffect(() => {
@@ -51,8 +57,10 @@ export default function CameraView({
     if (isAnalyzing) {
       setRoiState("analyzing");
       setStatusText("분석 중입니다...");
+      setStableProgress(1);
     } else {
       stableCountRef.current = 0;
+      setStableProgress(0);
       setRoiState(status === "ready" ? "scanning" : "idle");
       if (status === "ready") {
         setStatusText("칩을 가이드 영역 안에 맞춰 주세요");
@@ -131,20 +139,42 @@ export default function CameraView({
       const tooMoving = motion > MAX_MOTION;
       setLowLight(tooDark);
 
+      // 칩 색상 유효성 (균일색 + 채도)
+      const rgb = meanRgb(imageData);
+      const avgStd = (rgb.stdR + rgb.stdG + rgb.stdB) / 3;
+      const looksLikeChip =
+        avgStd <= PREVIEW_MAX_COLOR_STD &&
+        rgb.saturation >= PREVIEW_MIN_SATURATION;
+
+      const resetStable = () => {
+        stableCountRef.current = 0;
+        setStableProgress(0);
+      };
+
       if (tooDark) {
         setRoiState("scanning");
         setStatusText("조명이 어두워 판별이 어려울 수 있습니다.");
-        stableCountRef.current = 0;
+        resetStable();
       } else if (tooBright) {
         setRoiState("scanning");
         setStatusText("화면이 너무 밝습니다. 각도를 조절해 주세요.");
-        stableCountRef.current = 0;
+        resetStable();
       } else if (tooBlurry || tooMoving) {
         setRoiState("scanning");
         setStatusText("칩을 확인하는 중입니다");
-        stableCountRef.current = 0;
+        resetStable();
+      } else if (!looksLikeChip) {
+        // 칩이 아닌 일반 사물로 판단 → 카운트 시작 안 함
+        setRoiState("scanning");
+        setStatusText("칩이 인식되지 않습니다");
+        resetStable();
       } else {
         stableCountRef.current += 1;
+        const progress = Math.min(
+          1,
+          stableCountRef.current / STABLE_FRAMES_REQUIRED,
+        );
+        setStableProgress(progress);
         if (stableCountRef.current >= STABLE_FRAMES_REQUIRED) {
           // 안정화 완료 → 캡처
           lockedRef.current = true;
@@ -152,8 +182,8 @@ export default function CameraView({
           setStatusText("분석 중입니다...");
           await captureAndSend(rect);
         } else {
-          setRoiState("scanning");
-          setStatusText("칩을 확인하는 중입니다");
+          setRoiState("detected");
+          setStatusText("칩 인식됨 — 잠시만 유지해 주세요");
         }
       }
 
@@ -206,9 +236,11 @@ export default function CameraView({
       ? "border-emerald-400"
       : roiState === "analyzing"
         ? "border-amber-400"
-        : roiState === "scanning"
-          ? "border-sky-400"
-          : "border-white/50";
+        : roiState === "detected"
+          ? "border-emerald-300"
+          : roiState === "scanning"
+            ? "border-sky-400"
+            : "border-white/50";
 
   return (
     <div className="relative w-full h-full bg-black overflow-hidden">
@@ -266,7 +298,19 @@ export default function CameraView({
             />
           ))}
 
-          {/* 분석중 progress bar */}
+          {/* 칩 인식 진행 — 작은 시계모양 카운트다운 링 */}
+          {(roiState === "detected" ||
+            roiState === "stable" ||
+            roiState === "analyzing") && (
+            <div className="absolute top-2 right-2">
+              <ClockProgressRing
+                progress={stableProgress}
+                state={roiState}
+              />
+            </div>
+          )}
+
+          {/* 분석중 라벨 */}
           {roiState === "analyzing" && (
             <div className="absolute -bottom-3 left-0 right-0 flex justify-center">
               <div className="px-3 py-1 rounded-full bg-amber-400/90 text-amber-950 text-xs font-medium shadow">
@@ -343,6 +387,84 @@ export default function CameraView({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+interface ClockProgressRingProps {
+  progress: number; // 0..1
+  state: RoiState;
+}
+
+function ClockProgressRing({ progress, state }: ClockProgressRingProps) {
+  const size = 44;
+  const stroke = 4;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(1, progress));
+  const dashOffset = c * (1 - clamped);
+
+  const color =
+    state === "analyzing"
+      ? "#fbbf24" // amber-400
+      : state === "stable"
+        ? "#34d399" // emerald-400
+        : "#6ee7b7"; // emerald-300 (detected)
+
+  const pct = Math.round(clamped * 100);
+
+  return (
+    <div
+      className="relative flex items-center justify-center rounded-full bg-black/55 backdrop-blur-sm shadow-md"
+      style={{ width: size + 6, height: size + 6 }}
+      aria-label={`칩 인식 ${pct}%`}
+    >
+      <svg
+        width={size}
+        height={size}
+        className={state === "analyzing" ? "animate-spin-slow" : ""}
+      >
+        {/* 배경 트랙 */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="rgba(255,255,255,0.25)"
+          strokeWidth={stroke}
+        />
+        {/* 진행 — 12시 방향에서 시계방향으로 채워짐 */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={dashOffset}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          style={{ transition: "stroke-dashoffset 120ms linear" }}
+        />
+        {/* 시계 바늘 */}
+        <g
+          transform={`rotate(${clamped * 360} ${size / 2} ${size / 2})`}
+          style={{ transition: "transform 120ms linear" }}
+        >
+          {/* 시침 */}
+          <line
+            x1={size / 2}
+            y1={size / 2}
+            x2={size / 2}
+            y2={size / 2 - r * 0.55}
+            stroke={color}
+            strokeWidth={2}
+            strokeLinecap="round"
+          />
+          <circle cx={size / 2} cy={size / 2} r={2} fill={color} />
+        </g>
+      </svg>
     </div>
   );
 }
