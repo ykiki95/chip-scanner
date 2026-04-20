@@ -1,14 +1,16 @@
 import { useCallback, useState } from "react";
 import CameraView, { type FrameDiagnostics } from "@/components/CameraView";
-import ResultView, { type ResultMeasurement } from "@/components/ResultView";
+import ResultView, {
+  type ResultMeasurement,
+  type ResultViewResult,
+} from "@/components/ResultView";
 import { analyzeBlobWithGate } from "@/utils/analyzer";
-import type { PredictionResult } from "@/utils/constants";
 
 type Phase = "camera" | "result" | "exited";
 
 export default function Scanner() {
   const [phase, setPhase] = useState<Phase>("camera");
-  const [result, setResult] = useState<PredictionResult | null>(null);
+  const [result, setResult] = useState<ResultViewResult | null>(null);
   const [measurement, setMeasurement] = useState<ResultMeasurement | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);

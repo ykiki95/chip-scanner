@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { RESULT_DISPLAY, type PredictionResult } from "@/utils/constants";
+import type { ChipGateResult } from "@/utils/chipGate";
+import { toKoreanImagenetLabel } from "@/utils/imagenetKoLabels";
 
 export interface ResultMeasurement {
   r: number;
@@ -8,8 +11,12 @@ export interface ResultMeasurement {
   colorStd: number;
 }
 
+export interface ResultViewResult extends PredictionResult {
+  gate?: ChipGateResult | null;
+}
+
 interface Props {
-  result: PredictionResult;
+  result: ResultViewResult;
   measurement?: ResultMeasurement | null;
   onRetry: () => void;
   onExit: () => void;
@@ -85,6 +92,8 @@ export default function ResultView({ result, measurement, onRetry, onExit }: Pro
   const display = RESULT_DISPLAY[result.label] ?? RESULT_DISPLAY.consumable;
   const style = TONE_STYLES[display.tone];
   const confidencePct = Math.round((result.confidence ?? 0) * 100);
+  const [showGate, setShowGate] = useState(false);
+  const gateTop3 = (result.gate?.predictions ?? []).slice(0, 3);
 
   return (
     <div
@@ -138,6 +147,82 @@ export default function ResultView({ result, measurement, onRetry, onExit }: Pro
           </div>
         )}
       </div>
+
+      {/* 1차 게이트 판단 근거 토글 */}
+      {gateTop3.length > 0 && (
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => setShowGate((v) => !v)}
+            aria-expanded={showGate}
+            aria-controls="gate-evidence-panel"
+            className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-white/70 border border-border/60 text-xs font-medium text-foreground/70 hover-elevate active-elevate-2"
+          >
+            <span className="inline-flex items-center gap-2">
+              <span className={`w-1.5 h-1.5 rounded-full ${style.accent}`} />
+              인식된 사물 근거 보기
+              {result.gate && (
+                <span className="text-foreground/40">
+                  · {result.gate.isChip ? "지시계 후보" : "지시계 아님"}
+                </span>
+              )}
+            </span>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              className={`w-4 h-4 transition-transform ${showGate ? "rotate-180" : ""}`}
+              aria-hidden
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {showGate && (
+            <div
+              id="gate-evidence-panel"
+              className="mt-2 px-4 py-3 rounded-xl bg-white/80 border border-border/60 text-left"
+            >
+              <p className="text-[11px] text-foreground/50 mb-2">
+                MobileNet(ImageNet) 상위 3개 후보
+              </p>
+              <ul className="space-y-2">
+                {gateTop3.map((p, idx) => {
+                  const pct = Math.round(p.probability * 100);
+                  const ko = toKoreanImagenetLabel(p.className);
+                  return (
+                    <li key={`${p.className}-${idx}`} className="text-xs">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="font-medium text-foreground/80 truncate">
+                          {idx + 1}. {ko}
+                        </span>
+                        <span className="font-mono text-foreground/60 tabular-nums">
+                          {pct}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-foreground/10 overflow-hidden">
+                        <div
+                          className={`h-full ${style.accent}`}
+                          style={{ width: `${Math.max(2, Math.min(100, pct))}%` }}
+                        />
+                      </div>
+                      <p className="mt-0.5 text-[10px] font-mono text-foreground/40 truncate">
+                        {p.className}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+              {result.gate?.reason && (
+                <p className="mt-3 text-[11px] text-foreground/60 leading-relaxed">
+                  판단 근거: {result.gate.reason}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 하단 버튼 */}
       <div className="grid grid-cols-2 gap-3 mt-6">
