@@ -13,6 +13,7 @@
 - **Backend**: Python 3.10+ / FastAPI / PyTorch / torchvision (`backend/`)
 - **Model**: ResNet50 transfer learning (3 classes)
 - **Training**: Google Colab — `training/train_resnet50_colab.py`
+- **Chip-vs-object gate**: TensorFlow.js MobileNet v1 (alpha 0.25, 224) — `artifacts/chip-scanner/public/models/mobilenet/`. 일반 사물(병/캔/박스/과일 등)을 1차로 걸러낸다.
 - **Monorepo**: pnpm workspaces
 
 ## Key Commands

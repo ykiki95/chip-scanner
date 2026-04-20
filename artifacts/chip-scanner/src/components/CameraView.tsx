@@ -14,6 +14,7 @@ import {
 } from "@/utils/constants";
 import { computeQuality, computeMotion } from "@/utils/imageQuality";
 import { meanRgb } from "@/utils/analyzer";
+import { preloadChipGate } from "@/utils/chipGate";
 
 type RoiState = "idle" | "scanning" | "detected" | "stable" | "analyzing";
 
@@ -78,9 +79,10 @@ export default function CameraView({
   const [showDiagnostics, setShowDiagnostics] = useState(true);
   const lastDiagnosticsRef = useRef<FrameDiagnostics | null>(null);
 
-  // mount: 카메라 시작
+  // mount: 카메라 시작 + 칩 게이트 모델 프리로드
   useEffect(() => {
     void start();
+    preloadChipGate();
     return () => stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

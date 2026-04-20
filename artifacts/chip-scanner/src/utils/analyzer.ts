@@ -5,6 +5,7 @@ import {
   type PredictionResult,
   type PredictionLabel,
 } from "./constants";
+import { classifyChipGate, type ChipGateResult } from "./chipGate";
 
 // 문서 기준 RGB 임계값
 // - pH 지시계 (신선):     R[160,219]  G[34,136]   B[53,74]
@@ -196,6 +197,60 @@ export async function analyzeBlob(blob: Blob): Promise<AnalysisResult> {
     const imageData = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
     const stats = meanRgb(imageData);
     return classifyByRgb(stats);
+  } finally {
+    bitmap.close?.();
+  }
+}
+
+export interface GatedAnalysisResult extends AnalysisResult {
+  gate: ChipGateResult | null;
+  gateError?: string;
+}
+
+/**
+ * Blob 을 디코딩 → MobileNet 1차 게이트 → RGB 분류
+ *
+ * 게이트가 "지시계 아님" 으로 판단하면 RGB 분류를 건너뛰고
+ * "지시계가 아님" 안내를 반환한다. 게이트 모델 로딩이 실패하면
+ * 안전하게 RGB 분류로 fallback 한다.
+ */
+export async function analyzeBlobWithGate(
+  blob: Blob,
+): Promise<GatedAnalysisResult> {
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) throw new Error("캔버스 컨텍스트를 생성할 수 없습니다.");
+    ctx.drawImage(bitmap, 0, 0);
+    const imageData = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+    const stats = meanRgb(imageData);
+
+    let gate: ChipGateResult | null = null;
+    let gateError: string | undefined;
+    try {
+      gate = await classifyChipGate(canvas);
+    } catch (err) {
+      gateError = err instanceof Error ? err.message : String(err);
+      console.warn("[analyzer] chip gate failed, falling back", err);
+    }
+
+    if (gate && !gate.isChip) {
+      return {
+        label: "not_recommended",
+        display_text: "지시계가 아님",
+        reason: gate.reason,
+        confidence: Math.max(0.85, gate.topProbability),
+        rgb: stats,
+        gate,
+        gateError,
+      };
+    }
+
+    const rgbResult = classifyByRgb(stats);
+    return { ...rgbResult, gate, gateError };
   } finally {
     bitmap.close?.();
   }
