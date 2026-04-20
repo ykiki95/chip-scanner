@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "포장 칩 판별"
+title = "로터스바이오 TTI AI 품질 스캐너"
 version = "1.0.0"
 id = "artifacts/chip-scanner"
 router = "path"
