@@ -46,7 +46,22 @@ export default function CameraView({
   isAnalyzing,
   errorBanner,
 }: Props) {
-  const { videoRef, status, errorMessage, start, stop } = useCamera();
+  const {
+    videoRef,
+    status,
+    errorMessage,
+    start,
+    stop,
+    torchSupported,
+    torchOn,
+    toggleTorch,
+    exposureSupported,
+    exposure,
+    boostExposure,
+    resetExposure,
+  } = useCamera();
+  const exposureBoostedRef = useRef(false);
+  const [torchBusy, setTorchBusy] = useState(false);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const sampleCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -158,6 +173,23 @@ export default function CameraView({
       const tooMoving = motion > MAX_MOTION;
       setLowLight(tooDark);
 
+      // 어두운 환경에서 노출 보정 자동 적용 / 복원
+      if (exposureSupported) {
+        if (tooDark && !exposureBoostedRef.current) {
+          // 성공한 경우에만 boosted 상태 기록 — 실패 시 재시도 가능
+          void boostExposure().then((ok) => {
+            if (ok) exposureBoostedRef.current = true;
+          });
+        } else if (
+          exposureBoostedRef.current &&
+          (tooBright || brightness > MIN_BRIGHTNESS + 25)
+        ) {
+          // 충분히 밝아졌거나, 보정으로 인해 오히려 과노출이 되면 복원
+          exposureBoostedRef.current = false;
+          void resetExposure();
+        }
+      }
+
       // 칩 색상 유효성 (균일색 + 채도)
       const rgb = meanRgb(imageData);
       const avgStd = (rgb.stdR + rgb.stdG + rgb.stdB) / 3;
@@ -267,7 +299,25 @@ export default function CameraView({
     return () => {
       cancelled = true;
     };
-  }, [status, getRoiRect, onCapture, videoRef]);
+  }, [
+    status,
+    getRoiRect,
+    onCapture,
+    videoRef,
+    exposureSupported,
+    boostExposure,
+    resetExposure,
+  ]);
+
+  const onTorchClick = useCallback(async () => {
+    if (torchBusy) return;
+    setTorchBusy(true);
+    try {
+      await toggleTorch();
+    } finally {
+      setTorchBusy(false);
+    }
+  }, [toggleTorch, torchBusy]);
 
   // ROI 박스 색상
   const borderColor =
@@ -377,8 +427,55 @@ export default function CameraView({
       <div className="absolute bottom-0 left-0 right-0 pb-[env(safe-area-inset-bottom)] bg-gradient-to-t from-black/80 to-transparent pointer-events-none">
         <div className="px-5 pt-10 pb-6 flex flex-col items-center gap-2">
           {lowLight && (
-            <div className="px-3 py-1 rounded-full bg-amber-500/90 text-white text-xs font-medium">
-              어두운 환경 감지
+            <div className="flex flex-col items-center gap-2 pointer-events-auto">
+              <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                <span className="px-3 py-1 rounded-full bg-amber-500/90 text-white text-xs font-medium">
+                  어두운 환경 감지
+                </span>
+                {exposureSupported && exposure && exposure.current > 0 && (
+                  <span className="px-2 py-1 rounded-full bg-black/55 text-amber-200 text-[11px] font-mono border border-white/10">
+                    노출 +{exposure.current.toFixed(1)}
+                  </span>
+                )}
+                {torchOn && (
+                  <span className="px-2 py-1 rounded-full bg-amber-300/90 text-amber-950 text-[11px] font-medium">
+                    토치 ON
+                  </span>
+                )}
+              </div>
+              {torchSupported && (
+                <button
+                  onClick={onTorchClick}
+                  disabled={torchBusy}
+                  className={`px-4 py-2 rounded-full text-sm font-medium shadow-lg hover-elevate active-elevate-2 transition-colors ${
+                    torchOn
+                      ? "bg-amber-300 text-amber-950"
+                      : "bg-white text-black"
+                  } disabled:opacity-60`}
+                  aria-pressed={torchOn}
+                  aria-label="토치 켜기"
+                >
+                  {torchOn ? "토치 끄기" : "토치 켜기"}
+                </button>
+              )}
+            </div>
+          )}
+          {!lowLight && (torchOn || (exposure && exposure.current > 0)) && (
+            <div className="flex items-center gap-1.5 pointer-events-auto">
+              {torchOn && (
+                <button
+                  onClick={onTorchClick}
+                  disabled={torchBusy}
+                  className="px-3 py-1 rounded-full bg-amber-300/90 text-amber-950 text-[11px] font-medium hover-elevate active-elevate-2"
+                >
+                  토치 ON · 끄기
+                </button>
+              )}
+              {exposure && exposure.current > 0 && (
+                <span className="px-2 py-1 rounded-full bg-black/55 text-amber-200 text-[11px] font-mono border border-white/10">
+                  노출 +{exposure.current.toFixed(1)}
+                </span>
+              )}
             </div>
           )}
           <p className="text-white text-base font-medium text-center drop-shadow">
