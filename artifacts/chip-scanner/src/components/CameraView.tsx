@@ -299,11 +299,11 @@ export default function CameraView({
       {/* 상단 그라디언트 + 타이틀 */}
       <div className="absolute top-0 left-0 right-0 pt-[env(safe-area-inset-top)] bg-gradient-to-b from-black/70 to-transparent pointer-events-none">
         <div className="px-5 py-4">
-          <h1 className="text-white text-lg font-semibold tracking-tight">
-            포장 칩 판별
+          <h1 className="text-white text-base font-semibold tracking-tight">
+            로터스바이오 TTI AI 품질 스캐너
           </h1>
           <p className="text-white/70 text-xs mt-0.5">
-            지시계를 가이드 영역에 맞춰 주세요
+            원형 인디케이터를 가운데 점선 원 안에 맞춰 주세요
           </p>
         </div>
       </div>
@@ -336,6 +336,19 @@ export default function CameraView({
               )}`}
             />
           ))}
+
+          {/* 인디케이터 인식 영역 — 가운데 점선 원 (네모 짧은 변의 약 40%) */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div
+              className="rounded-full border-2 border-dashed border-white/85"
+              style={{
+                width: "40%",
+                aspectRatio: "1 / 1",
+                boxShadow: "0 0 0 1px rgba(0,0,0,0.25) inset",
+              }}
+              aria-label="인디케이터 색 판독 영역"
+            />
+          </div>
 
           {/* 칩 인식 진행 — 작은 시계모양 카운트다운 링 */}
           {(roiState === "detected" ||

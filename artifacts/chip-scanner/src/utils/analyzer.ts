@@ -50,13 +50,22 @@ export function meanRgb(imageData: ImageData): RgbStats {
   let g2 = 0;
   let b2 = 0;
   let n = 0;
-  // 중앙 60% 영역만 사용해서 가이드 박스 가장자리/배경 영향 최소화
-  const x0 = Math.floor(w * 0.2);
-  const x1 = Math.floor(w * 0.8);
-  const y0 = Math.floor(h * 0.2);
-  const y1 = Math.floor(h * 0.8);
+  // 가운데 원형 점선 영역(짧은 변의 약 40%) 안 픽셀만 표본 추출
+  // 가이드 박스 가장자리/배경 영향을 최소화하고, 원형 인디케이터의 정중앙
+  // 색만 정확히 평가한다.
+  const cx = w / 2;
+  const cy = h / 2;
+  const radius = Math.min(w, h) * 0.2; // 지름 40% → 반지름 20%
+  const r2max = radius * radius;
+  const x0 = Math.max(0, Math.floor(cx - radius));
+  const x1 = Math.min(w, Math.ceil(cx + radius));
+  const y0 = Math.max(0, Math.floor(cy - radius));
+  const y1 = Math.min(h, Math.ceil(cy + radius));
   for (let y = y0; y < y1; y += 2) {
+    const dy = y - cy;
     for (let x = x0; x < x1; x += 2) {
+      const dx = x - cx;
+      if (dx * dx + dy * dy > r2max) continue;
       const i = (y * w + x) * 4;
       const cr = data[i];
       const cg = data[i + 1];
