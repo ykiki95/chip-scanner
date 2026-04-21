@@ -593,7 +593,7 @@ function DiagnosticsPanel({ d }: { d: FrameDiagnostics }) {
             R {fmt(d.r)} · G {fmt(d.g)} · B {fmt(d.b)}
           </span>
           <span className="ml-auto text-[10px] text-white/70 font-mono">
-            채도 {d.saturation.toFixed(2)} · σ {fmt(d.colorStd, 1)}
+            σ {fmt(d.colorStd, 1)} · v{__APP_VERSION__}
           </span>
         </div>
         <div className="flex flex-wrap gap-1">
@@ -603,10 +603,6 @@ function DiagnosticsPanel({ d }: { d: FrameDiagnostics }) {
           <Check
             ok={d.checks.uniformity}
             label={`단일색${d.checks.uniformity ? "" : `(σ=${fmt(d.colorStd, 0)})`}`}
-          />
-          <Check
-            ok={d.checks.saturation}
-            label={`채도${d.checks.saturation ? "" : `(${d.saturation.toFixed(2)})`}`}
           />
         </div>
       </div>

@@ -15,8 +15,14 @@ if (Number.isNaN(port) || port <= 0) {
 
 const basePath = process.env.BASE_PATH ?? "/";
 
+// 빌드 시점 타임스탬프를 앱 버전으로 노출 (배포된 번들이 최신인지 화면에서 확인용)
+const APP_VERSION = new Date().toISOString().slice(5, 16).replace("T", " ");
+
 export default defineConfig({
   base: basePath,
+  define: {
+    __APP_VERSION__: JSON.stringify(APP_VERSION),
+  },
   plugins: [
     react(),
     tailwindcss(),
