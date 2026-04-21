@@ -32,13 +32,15 @@ pres.layout = "LAYOUT_WIDE"; // 13.333 x 7.5
 pres.title = "Lotusbio TTI AI 품질 스캐너 — 투자자 자료";
 pres.author = "Lotusbio";
 
+const TOTAL_PAGES = 5;
+
 const W = 13.333;
 const H = 7.5;
 
 // ============================================================
 // 공통 헬퍼
 // ============================================================
-function addHeader(slide, pageNum, totalPages = 4) {
+function addHeader(slide, pageNum, totalPages = TOTAL_PAGES) {
   // 좌상단 워드마크
   slide.addShape("rect", {
     x: 0,
@@ -291,7 +293,7 @@ function arrow(slide, x, y, w) {
     });
   });
 
-  s.addText("p.1 / 4", {
+  s.addText(`1 / ${TOTAL_PAGES}`, {
     x: W - 1.0, y: H - 0.4, w: 0.6, h: 0.3,
     fontFace: FONT, fontSize: 9, color: COLOR.white, align: "right",
   });
@@ -715,7 +717,190 @@ function arrow(slide, x, y, w) {
   });
 }
 
+// ============================================================
+// SLIDE 5 — 데이터셋 · Active Learning · 정확도 한계 (투자 어필)
+// ============================================================
+{
+  const s = pres.addSlide();
+  s.background = { color: COLOR.white };
+  addHeader(s, 5);
+  title(s, "왜 지속적인 투자가 필요한가",
+    "AI 정확도의 핵심은 모델이 아니라 데이터 — 한 번 만들고 끝나는 사업이 아닙니다");
+
+  // ===== 상단 좌측: 데이터셋 확보 카드 =====
+  const topY = 2.0;
+  const topH = 2.55;
+  const halfW = 6.05;
+
+  s.addShape("roundRect", {
+    x: 0.5, y: topY, w: halfW, h: topH,
+    rectRadius: 0.15,
+    fill: { color: COLOR.bgAlt },
+    line: { color: COLOR.primary, width: 1.2 },
+  });
+  s.addShape("rect", {
+    x: 0.5, y: topY, w: halfW, h: 0.5,
+    fill: { color: COLOR.primary }, line: { color: COLOR.primary },
+  });
+  s.addText("STEP 1 — 데이터셋 확보 (가장 큰 자본 집행)", {
+    x: 0.7, y: topY + 0.05, w: halfW - 0.4, h: 0.4,
+    fontFace: FONT_BOLD, fontSize: 11, bold: true, color: COLOR.white, charSpacing: 1,
+  });
+
+  // 큰 숫자 카드 3개
+  const dataCards = [
+    { num: "30,000+", label: "라벨링 사진", sub: "조명·각도·배경·\n포장재·부분 변색" },
+    { num: "6 개월", label: "수집·라벨링 기간", sub: "전문 라벨러 +\n식품공학 검수" },
+    { num: "₩4 억+", label: "추정 데이터 비용", sub: "라벨링 외주 +\n현장 촬영 + 검수" },
+  ];
+  const dcW = (halfW - 0.6) / 3;
+  dataCards.forEach((c, i) => {
+    const cx = 0.7 + i * dcW;
+    s.addShape("rect", {
+      x: cx + 0.05, y: topY + 0.7, w: dcW - 0.1, h: 1.7,
+      fill: { color: COLOR.white }, line: { color: COLOR.line, width: 0.5 },
+    });
+    s.addText(c.num, {
+      x: cx + 0.05, y: topY + 0.8, w: dcW - 0.1, h: 0.55,
+      fontFace: FONT_BOLD, fontSize: 22, bold: true, align: "center", color: COLOR.primary,
+    });
+    s.addText(c.label, {
+      x: cx + 0.05, y: topY + 1.35, w: dcW - 0.1, h: 0.3,
+      fontFace: FONT_BOLD, fontSize: 10.5, bold: true, align: "center", color: COLOR.textDark,
+    });
+    s.addText(c.sub, {
+      x: cx + 0.1, y: topY + 1.65, w: dcW - 0.2, h: 0.7,
+      fontFace: FONT, fontSize: 9, align: "center", color: COLOR.textMute, valign: "top",
+    });
+  });
+
+  // ===== 상단 우측: Active Learning 카드 =====
+  const rightX = W - 0.5 - halfW;
+  s.addShape("roundRect", {
+    x: rightX, y: topY, w: halfW, h: topH,
+    rectRadius: 0.15,
+    fill: { color: COLOR.successSoft },
+    line: { color: COLOR.success, width: 1.2 },
+  });
+  s.addShape("rect", {
+    x: rightX, y: topY, w: halfW, h: 0.5,
+    fill: { color: COLOR.success }, line: { color: COLOR.success },
+  });
+  s.addText("STEP 2 — Active Learning 사이클 (지속 운영비)", {
+    x: rightX + 0.2, y: topY + 0.05, w: halfW - 0.4, h: 0.4,
+    fontFace: FONT_BOLD, fontSize: 11, bold: true, color: COLOR.white, charSpacing: 1,
+  });
+
+  // 순환 다이어그램 — 4단계 시계방향
+  const cycleLabels = ["사용자 촬영\n수집", "낮은 신뢰도\n샘플 추출", "재라벨링 +\n재학습", "신모델\nOTA 배포"];
+  const cycleColors = [COLOR.accent, COLOR.warn, COLOR.primary, COLOR.success];
+  const ccx = rightX + halfW / 2;
+  const ccy = topY + 1.4;
+  const cR = 0.85;
+  const positions = [
+    { x: ccx, y: ccy - cR },          // top
+    { x: ccx + cR, y: ccy },          // right
+    { x: ccx, y: ccy + cR },          // bottom
+    { x: ccx - cR, y: ccy },          // left
+  ];
+  // 중앙
+  s.addShape("ellipse", {
+    x: ccx - 0.45, y: ccy - 0.3, w: 0.9, h: 0.6,
+    fill: { color: COLOR.success }, line: { color: COLOR.white, width: 1.5 },
+  });
+  s.addText("REPEAT\n매 분기", {
+    x: ccx - 0.5, y: ccy - 0.28, w: 1.0, h: 0.55,
+    fontFace: FONT_BOLD, fontSize: 9.5, bold: true, align: "center", color: COLOR.white, valign: "middle",
+  });
+  positions.forEach((p, i) => {
+    s.addShape("ellipse", {
+      x: p.x - 0.42, y: p.y - 0.3, w: 0.84, h: 0.55,
+      fill: { color: cycleColors[i] }, line: { color: COLOR.white, width: 1.5 },
+    });
+    s.addText(cycleLabels[i], {
+      x: p.x - 0.55, y: p.y - 0.32, w: 1.1, h: 0.55,
+      fontFace: FONT_BOLD, fontSize: 8.5, bold: true, align: "center", color: COLOR.white, valign: "middle",
+    });
+  });
+
+  // 우측 하단 비용 라인
+  s.addText("운영 비용 — 분기당 ₩6,000만+ (재라벨링 + 컴퓨팅 + 모델 배포)", {
+    x: rightX + 0.2, y: topY + topH - 0.4, w: halfW - 0.4, h: 0.3,
+    fontFace: FONT_BOLD, fontSize: 10, bold: true, align: "center", color: COLOR.success,
+  });
+
+  // ===== 하단: 100% 정확도 불가 — 솔직성 카드 =====
+  const botY = 4.85;
+  const botH = 2.0;
+  s.addShape("roundRect", {
+    x: 0.5, y: botY, w: W - 1, h: botH,
+    rectRadius: 0.15,
+    fill: { color: COLOR.warnSoft },
+    line: { color: COLOR.warn, width: 1.2 },
+  });
+  s.addShape("rect", {
+    x: 0.5, y: botY, w: W - 1, h: 0.5,
+    fill: { color: COLOR.warn }, line: { color: COLOR.warn },
+  });
+  s.addText("STEP 3 — 정확도 100%는 물리적으로 불가능합니다 (현실적 기대치 공유)", {
+    x: 0.7, y: botY + 0.05, w: W - 1.4, h: 0.4,
+    fontFace: FONT_BOLD, fontSize: 11, bold: true, color: COLOR.white, charSpacing: 1,
+  });
+
+  // 좌측: 5가지 한계 요인
+  s.addText("절대 통제할 수 없는 5가지 변수", {
+    x: 0.7, y: botY + 0.6, w: 6.0, h: 0.3,
+    fontFace: FONT_BOLD, fontSize: 11, bold: true, color: COLOR.textDark,
+  });
+  const factors = [
+    "📷  카메라 센서 편차 (기종마다 색감 다름)",
+    "💡  조명 환경 (LED·형광등·자연광·그늘)",
+    "📦  포장재 반사·결로·비닐 광택",
+    "🧪  칩 자체의 제조 편차 · 온도 이력",
+    "👆  사용자 촬영 각도 · 손가락 가림",
+  ];
+  factors.forEach((f, i) => {
+    s.addText(f, {
+      x: 0.85, y: botY + 0.95 + i * 0.18, w: 5.8, h: 0.2,
+      fontFace: FONT, fontSize: 10, color: COLOR.textDark,
+    });
+  });
+
+  // 우측: 목표치 박스 + 면책
+  const tgtX = 7.0;
+  s.addText("실현 가능한 목표 정확도", {
+    x: tgtX, y: botY + 0.6, w: 5.8, h: 0.3,
+    fontFace: FONT_BOLD, fontSize: 11, bold: true, color: COLOR.textDark,
+  });
+  // 두 개의 큰 숫자
+  const targets = [
+    { num: "≥ 95%", label: "Beta 출시 시점", color: COLOR.warn },
+    { num: "≥ 98%", label: "1년 운영 후 (Active Learning)", color: COLOR.success },
+  ];
+  targets.forEach((t, i) => {
+    const tx = tgtX + i * 2.9;
+    s.addShape("rect", {
+      x: tx, y: botY + 0.95, w: 2.7, h: 0.6,
+      fill: { color: COLOR.white }, line: { color: t.color, width: 1.5 },
+    });
+    s.addText(t.num, {
+      x: tx + 0.05, y: botY + 1.0, w: 1.0, h: 0.5,
+      fontFace: FONT_BOLD, fontSize: 18, bold: true, align: "center", color: t.color, valign: "middle",
+    });
+    s.addText(t.label, {
+      x: tx + 1.0, y: botY + 1.0, w: 1.6, h: 0.5,
+      fontFace: FONT, fontSize: 9.5, color: COLOR.textDark, valign: "middle",
+    });
+  });
+  s.addText("100% 보장형 의료/안전 인증 도구가 아닌 \"보조 판정 도구\"로 포지셔닝 — 식약처 식품 보조표시 가이드라인 준용", {
+    x: tgtX, y: botY + 1.62, w: 5.8, h: 0.32,
+    fontFace: FONT, fontSize: 9, italic: true, color: COLOR.textMute,
+  });
+}
+
+// ============================================================
 // 저장
+// ============================================================
 const outPath = path.resolve(__dirname, "../exports/lotusbio_tti_demo.pptx");
 pres.writeFile({ fileName: outPath }).then((f) => {
   console.log("✓ saved:", f);
