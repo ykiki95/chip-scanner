@@ -192,12 +192,12 @@ export default function CameraView({
         }
       }
 
-      // 칩 색상 유효성 (균일색 + 채도)
+      // 칩 색상 유효성 (균일색만 검사 — 새 색상표는 거의 무채색에 가까운 칩도 포함)
       const rgb = meanRgb(imageData);
       const avgStd = (rgb.stdR + rgb.stdG + rgb.stdB) / 3;
       const uniformOk = avgStd <= PREVIEW_MAX_COLOR_STD;
       const saturationOk = rgb.saturation >= PREVIEW_MIN_SATURATION;
-      const looksLikeChip = uniformOk && saturationOk;
+      const looksLikeChip = uniformOk; // 채도 조건은 진단 표시용으로만 유지
 
       const diag: FrameDiagnostics = {
         r: rgb.r,

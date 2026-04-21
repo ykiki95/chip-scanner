@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
-<title>TTI 색상 칩 테스트 시트</title>
+<title>Lotusbio TTI 색상 칩 테스트 시트</title>
 <style>
   @page { size: A4; margin: 12mm; }
   * { box-sizing: border-box; }
@@ -46,113 +46,96 @@
   }
   .label { font-size: 11px; font-weight: 600; }
   .rgb { font-size: 10px; color: #444; font-family: ui-monospace, Menlo, monospace; }
-  .legend { font-size: 10px; color: #666; margin-top: 4px; }
   .footer { font-size: 10px; color: #777; margin-top: 12px; border-top: 1px dashed #ccc; padding-top: 8px; }
 </style>
 </head>
 <body>
 
-<h1>로터스바이오 TTI — 색상 칩 테스트 시트</h1>
+<h1>Lotusbio TTI — 색상 칩 테스트 시트 (신규 색상표)</h1>
 <p class="note">
-  컬러 프린터로 인쇄 후 각 원을 카메라 가이드 박스(점선 원) 안에 채워서 촬영해 보세요.
-  인쇄 색상 정확도는 프린터/용지에 따라 다를 수 있어, 각 범위마다 중심값·모서리값을 함께 제공합니다.
-  <strong>“색상 강제 인쇄”</strong> 옵션을 켜야 배경색이 실제로 출력됩니다.
+  컬러 프린터로 인쇄 후 각 원을 카메라 가이드 박스(점선 원) 안에 채워 촬영해 보세요.
+  반드시 인쇄 옵션에서 <strong>"배경 그래픽/색상 인쇄"</strong>를 켜야 색이 출력됩니다.
 </p>
 
-<h2>① 매우 신선 (FRESH) — R[160–219] / G[34–136] / B[53–74]</h2>
+<h2>① 신선함 (0–3 day) — R[135–229] / G[183–231] / B[198–229]</h2>
 <div class="grid">
-  <!-- center -->
   <div class="chip">
-    <div class="swatch" style="background: rgb(190,85,64);"></div>
-    <div class="label">중심값</div>
-    <div class="rgb">R190 G85 B64</div>
-  </div>
-  <!-- low corner -->
-  <div class="chip">
-    <div class="swatch" style="background: rgb(160,34,53);"></div>
-    <div class="label">최소 모서리</div>
-    <div class="rgb">R160 G34 B53</div>
-  </div>
-  <!-- high corner -->
-  <div class="chip">
-    <div class="swatch" style="background: rgb(219,136,74);"></div>
-    <div class="label">최대 모서리</div>
-    <div class="rgb">R219 G136 B74</div>
+    <div class="swatch" style="background: rgb(229,231,229);"></div>
+    <div class="label">매우 신선 (1번)</div>
+    <div class="rgb">R229 G231 B229</div>
   </div>
   <div class="chip">
-    <div class="swatch" style="background: rgb(175,60,58);"></div>
-    <div class="label">중간 (어두운 쪽)</div>
-    <div class="rgb">R175 G60 B58</div>
+    <div class="swatch" style="background: rgb(162,197,208);"></div>
+    <div class="label">신선 (2번)</div>
+    <div class="rgb">R162 G197 B208</div>
   </div>
   <div class="chip">
-    <div class="swatch" style="background: rgb(205,110,70);"></div>
-    <div class="label">중간 (밝은 쪽)</div>
-    <div class="rgb">R205 G110 B70</div>
-  </div>
-  <div class="chip">
-    <div class="swatch" style="background: rgb(195,95,65);"></div>
-    <div class="label">권장 테스트값</div>
-    <div class="rgb">R195 G95 B65</div>
+    <div class="swatch" style="background: rgb(135,183,198);"></div>
+    <div class="label">신선 (3번)</div>
+    <div class="rgb">R135 G183 B198</div>
   </div>
 </div>
 
-<h2>② 섭취 가능 (CONSUMABLE) — R[162–182] / G[106–136] / B[57–102]</h2>
+<h2>② 섭취 가능 (3–7 day) — R[80–107] / G[135–169] / B[160–190]</h2>
 <div class="grid">
   <div class="chip">
-    <div class="swatch" style="background: rgb(172,121,80);"></div>
-    <div class="label">중심값</div>
-    <div class="rgb">R172 G121 B80</div>
+    <div class="swatch" style="background: rgb(107,169,190);"></div>
+    <div class="label">섭취 가능 (4번)</div>
+    <div class="rgb">R107 G169 B190</div>
   </div>
   <div class="chip">
-    <div class="swatch" style="background: rgb(162,106,57);"></div>
-    <div class="label">최소 모서리</div>
-    <div class="rgb">R162 G106 B57</div>
+    <div class="swatch" style="background: rgb(94,156,176);"></div>
+    <div class="label">섭취 가능 (5번)</div>
+    <div class="rgb">R94 G156 B176</div>
   </div>
   <div class="chip">
-    <div class="swatch" style="background: rgb(182,136,102);"></div>
-    <div class="label">최대 모서리</div>
-    <div class="rgb">R182 G136 B102</div>
-  </div>
-  <div class="chip">
-    <div class="swatch" style="background: rgb(168,115,70);"></div>
-    <div class="label">중간 (어두운 쪽)</div>
-    <div class="rgb">R168 G115 B70</div>
-  </div>
-  <div class="chip">
-    <div class="swatch" style="background: rgb(178,128,90);"></div>
-    <div class="label">중간 (밝은 쪽)</div>
-    <div class="rgb">R178 G128 B90</div>
-  </div>
-  <div class="chip">
-    <div class="swatch" style="background: rgb(175,121,82);"></div>
-    <div class="label">권장 테스트값</div>
-    <div class="rgb">R175 G121 B82</div>
+    <div class="swatch" style="background: rgb(80,135,160);"></div>
+    <div class="label">섭취 가능 (6번)</div>
+    <div class="rgb">R80 G135 B160</div>
   </div>
 </div>
 
-<h2>③ 참고: 범위 밖 — 섭취 비권장 (REFERENCE)</h2>
+<h2>③ 섭취 비권장 (7–10 day) — R[42–71] / G[105–131] / B[128–155]</h2>
 <div class="grid">
   <div class="chip">
-    <div class="swatch" style="background: rgb(120,90,80);"></div>
-    <div class="label">갈색 (어두움)</div>
-    <div class="rgb">R120 G90 B80</div>
+    <div class="swatch" style="background: rgb(71,131,155);"></div>
+    <div class="label">섭취 비권장 (7번)</div>
+    <div class="rgb">R71 G131 B155</div>
   </div>
   <div class="chip">
-    <div class="swatch" style="background: rgb(90,70,55);"></div>
-    <div class="label">진한 갈색</div>
-    <div class="rgb">R90 G70 B55</div>
+    <div class="swatch" style="background: rgb(49,122,149);"></div>
+    <div class="label">섭취 비권장 (8번)</div>
+    <div class="rgb">R49 G122 B149</div>
   </div>
   <div class="chip">
-    <div class="swatch" style="background: rgb(220,180,140);"></div>
-    <div class="label">밝은 베이지</div>
-    <div class="rgb">R220 G180 B140</div>
+    <div class="swatch" style="background: rgb(42,105,128);"></div>
+    <div class="label">섭취 비권장 (9번)</div>
+    <div class="rgb">R42 G105 B128</div>
+  </div>
+</div>
+
+<h2>④ 참고: 지원하지 않는 색상 (REFERENCE)</h2>
+<div class="grid">
+  <div class="chip">
+    <div class="swatch" style="background: rgb(220,80,80);"></div>
+    <div class="label">빨간색 (범위 밖)</div>
+    <div class="rgb">R220 G80 B80</div>
+  </div>
+  <div class="chip">
+    <div class="swatch" style="background: rgb(100,180,100);"></div>
+    <div class="label">초록색 (범위 밖)</div>
+    <div class="rgb">R100 G180 B100</div>
+  </div>
+  <div class="chip">
+    <div class="swatch" style="background: rgb(20,40,80);"></div>
+    <div class="label">진한 파랑 (범위 밖)</div>
+    <div class="rgb">R20 G40 B80</div>
   </div>
 </div>
 
 <div class="footer">
-  팁 — 인쇄 후 형광등/자연광 아래에서 카메라 화이트밸런스가 안정된 뒤 촬영해 주세요.
-  실제 인쇄물 색상은 RGB 입력값과 ±10 정도 차이가 날 수 있습니다.
-  진단 패널의 평균 RGB 값을 확인하면서 가장 잘 잡히는 칩을 찾아 사용하세요.
+  팁 — 인쇄 후 형광등/자연광 아래에서 촬영해 주세요. 인쇄물 색상은 RGB 입력값과 ±10 정도 차이가 날 수 있습니다.
+  앱은 채널당 ±12 의 허용 오차 내에서는 자동 보정해 주지만, 그 이상 벗어나면 "지원하지 않는 색상"으로 판정됩니다.
 </div>
 
 </body>

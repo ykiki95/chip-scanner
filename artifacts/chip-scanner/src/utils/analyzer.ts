@@ -1,36 +1,44 @@
 import {
   RESULT_DISPLAY,
   PREVIEW_MAX_COLOR_STD,
-  PREVIEW_MIN_SATURATION,
   type PredictionResult,
   type PredictionLabel,
 } from "./constants";
 import { classifyChipGate, type ChipGateResult } from "./chipGate";
 
-// 문서 기준 RGB 임계값
-// - pH 지시계 (신선):     R[160,219]  G[34,136]   B[53,74]
-// - 황 함유 화합물 (섭취가능): R[162,182]  G[106,136]  B[57,102]
+// Lotusbio TTI 색상 기준 (이미지에서 추출한 9개 색상의 그룹별 RGB 범위)
+// 신선(0–3일):     [229,231,229] [162,197,208] [135,183,198]
+// 섭취 가능(3–7일): [107,169,190] [94,156,176] [80,135,160]
+// 섭취 비권장(7–10일): [71,131,155] [49,122,149] [42,105,128]
 export interface RgbRange {
   r: [number, number];
   g: [number, number];
   b: [number, number];
 }
 
-export const PH_FRESH_RANGE: RgbRange = {
-  r: [160, 219],
-  g: [34, 136],
-  b: [53, 74],
+export const FRESH_RANGE: RgbRange = {
+  r: [135, 229],
+  g: [183, 231],
+  b: [198, 229],
 };
 
-export const SULFUR_OK_RANGE: RgbRange = {
-  r: [162, 182],
-  g: [106, 136],
-  b: [57, 102],
+export const CONSUMABLE_RANGE: RgbRange = {
+  r: [80, 107],
+  g: [135, 169],
+  b: [160, 190],
 };
 
-// 지시계 유효성 검증 임계값 — 미리보기와 동일 기준 사용
+export const NOT_RECOMMENDED_RANGE: RgbRange = {
+  r: [42, 71],
+  g: [105, 131],
+  b: [128, 155],
+};
+
+// 채널 허용 오차 — 인쇄/카메라 색상 편차 보정용
+const CHANNEL_TOLERANCE = 12;
+
+// 지시계 유효성 검증: 가이드 박스 안 색상이 균일한지 확인 (변두리/배경 영향 최소화)
 const MAX_COLOR_STD = PREVIEW_MAX_COLOR_STD;
-const MIN_SATURATION = PREVIEW_MIN_SATURATION;
 
 export interface RgbStats {
   r: number;
@@ -94,8 +102,8 @@ export function meanRgb(imageData: ImageData): RgbStats {
   return { r: mr, g: mg, b: mb, stdR, stdG, stdB, saturation };
 }
 
-function inRange(v: number, range: [number, number]): boolean {
-  return v >= range[0] && v <= range[1];
+function inRange(v: number, range: [number, number], tol = 0): boolean {
+  return v >= range[0] - tol && v <= range[1] + tol;
 }
 
 function rangeDistance(stats: RgbStats, range: RgbRange): number {
@@ -111,11 +119,11 @@ function rangeDistance(stats: RgbStats, range: RgbRange): number {
   return dr + dg + db;
 }
 
-function inRgbRange(stats: RgbStats, range: RgbRange): boolean {
+function inRgbRange(stats: RgbStats, range: RgbRange, tol = 0): boolean {
   return (
-    inRange(stats.r, range.r) &&
-    inRange(stats.g, range.g) &&
-    inRange(stats.b, range.b)
+    inRange(stats.r, range.r, tol) &&
+    inRange(stats.g, range.g, tol) &&
+    inRange(stats.b, range.b, tol)
   );
 }
 
@@ -126,36 +134,47 @@ export interface AnalysisResult extends PredictionResult {
 export function classifyByRgb(stats: RgbStats): AnalysisResult {
   const avgStd = (stats.stdR + stats.stdG + stats.stdB) / 3;
   const isUniform = avgStd <= MAX_COLOR_STD;
-  const isSaturated = stats.saturation >= MIN_SATURATION;
-  const looksLikeChip = isUniform && isSaturated;
 
   let label: PredictionLabel;
   let confidence: number;
   let reasonOverride: string | null = null;
 
-  if (looksLikeChip && inRgbRange(stats, PH_FRESH_RANGE)) {
-    label = "very_fresh";
-    confidence = confidenceFromCenter(stats, PH_FRESH_RANGE);
-  } else if (looksLikeChip && inRgbRange(stats, SULFUR_OK_RANGE)) {
-    label = "consumable";
-    confidence = confidenceFromCenter(stats, SULFUR_OK_RANGE);
+  if (!isUniform) {
+    label = "unsupported";
+    reasonOverride =
+      "균일한 단일 색상이 감지되지 않았습니다. 지시계를 가이드 박스 안에 정확히 맞춰 주세요.";
+    confidence = 0.9;
   } else {
-    label = "not_recommended";
-    if (!isUniform) {
-      reasonOverride =
-        "지시계가 아닌 다른 사물이 감지되었습니다. 단일 색상의 지시계만 인식 가능합니다.";
-      confidence = 0.95;
-    } else if (!isSaturated) {
-      reasonOverride =
-        "지시계 색상이 인식되지 않았습니다 (무채색/회색 영역). 지시계를 가이드 박스 안에 정확히 맞춰 주세요.";
-      confidence = 0.9;
+    // 1차: 정확한 범위 매칭 (오차 없음)
+    if (inRgbRange(stats, FRESH_RANGE)) {
+      label = "very_fresh";
+      confidence = confidenceFromCenter(stats, FRESH_RANGE);
+    } else if (inRgbRange(stats, CONSUMABLE_RANGE)) {
+      label = "consumable";
+      confidence = confidenceFromCenter(stats, CONSUMABLE_RANGE);
+    } else if (inRgbRange(stats, NOT_RECOMMENDED_RANGE)) {
+      label = "not_recommended";
+      confidence = confidenceFromCenter(stats, NOT_RECOMMENDED_RANGE);
     } else {
-      // 색은 지시계 같은 균일색이지만 두 범위에 모두 안 들어감 → 변질 가능성
-      const dFresh = rangeDistance(stats, PH_FRESH_RANGE);
-      const dOk = rangeDistance(stats, SULFUR_OK_RANGE);
-      const minD = Math.min(dFresh, dOk);
-      // 가까울수록 신뢰도 약간 ↓ (경계 근처는 애매), 멀수록 명확히 변질
-      confidence = Math.min(0.99, 0.7 + minD / 250);
+      // 2차: 허용 오차 내 가장 가까운 범위로 보정 (인쇄/카메라 색차 흡수)
+      const candidates: Array<{ label: PredictionLabel; range: RgbRange; d: number }> = [
+        { label: "very_fresh", range: FRESH_RANGE, d: rangeDistance(stats, FRESH_RANGE) },
+        { label: "consumable", range: CONSUMABLE_RANGE, d: rangeDistance(stats, CONSUMABLE_RANGE) },
+        { label: "not_recommended", range: NOT_RECOMMENDED_RANGE, d: rangeDistance(stats, NOT_RECOMMENDED_RANGE) },
+      ];
+      candidates.sort((a, b) => a.d - b.d);
+      const best = candidates[0];
+      if (
+        best.d <= CHANNEL_TOLERANCE * 3 &&
+        inRgbRange(stats, best.range, CHANNEL_TOLERANCE)
+      ) {
+        label = best.label;
+        // 경계 밖이라 신뢰도는 약간 낮춤
+        confidence = Math.max(0.7, confidenceFromCenter(stats, best.range) - 0.1);
+      } else {
+        label = "unsupported";
+        confidence = Math.min(0.99, 0.7 + best.d / 250);
+      }
     }
   }
 
@@ -239,7 +258,7 @@ export async function analyzeBlobWithGate(
 
     if (gate && !gate.isChip) {
       return {
-        label: "not_recommended",
+        label: "unsupported",
         display_text: "지시계가 아님",
         reason: gate.reason,
         confidence: Math.max(0.85, gate.topProbability),

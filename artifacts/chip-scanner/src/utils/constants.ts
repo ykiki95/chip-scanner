@@ -1,4 +1,8 @@
-export type PredictionLabel = "very_fresh" | "consumable" | "not_recommended";
+export type PredictionLabel =
+  | "very_fresh"
+  | "consumable"
+  | "not_recommended"
+  | "unsupported";
 
 export interface PredictionResult {
   label: PredictionLabel;
@@ -9,22 +13,27 @@ export interface PredictionResult {
 
 export const RESULT_DISPLAY: Record<
   PredictionLabel,
-  { text: string; reason: string; tone: "fresh" | "ok" | "danger" }
+  { text: string; reason: string; tone: "fresh" | "ok" | "danger" | "neutral" }
 > = {
   very_fresh: {
-    text: "매우 신선",
-    reason: "칩의 색상 패턴이 신선 상태 기준과 매우 유사합니다.",
+    text: "신선함",
+    reason: "칩의 색상이 신선(0–3일) 기준 색상 범위에 해당합니다.",
     tone: "fresh",
   },
   consumable: {
     text: "섭취 가능",
-    reason: "칩의 색상 패턴이 섭취 가능한 범위에 해당합니다.",
+    reason: "칩의 색상이 섭취 가능(3–7일) 색상 범위에 해당합니다.",
     tone: "ok",
   },
   not_recommended: {
     text: "섭취 비권장",
-    reason: "칩의 색상 패턴이 품질 저하 또는 변질 가능성을 나타냅니다.",
+    reason: "칩의 색상이 섭취 비권장(7–10일) 색상 범위에 해당합니다.",
     tone: "danger",
+  },
+  unsupported: {
+    text: "지원하지 않는 색상",
+    reason: "칩이 지원하는 색상이 아닙니다.",
+    tone: "neutral",
   },
 };
 
