@@ -197,7 +197,9 @@ export default function CameraView({
       const avgStd = (rgb.stdR + rgb.stdG + rgb.stdB) / 3;
       const uniformOk = avgStd <= PREVIEW_MAX_COLOR_STD;
       const saturationOk = rgb.saturation >= PREVIEW_MIN_SATURATION;
-      const looksLikeChip = uniformOk; // 채도 조건은 진단 표시용으로만 유지
+      // PoC/데모 단계: 미리보기 단계 차단을 제거 — 밝기/선명도/안정성만 보고
+      // 무조건 캡처하여 분류 결과를 화면에 띄운다. 균일색·채도는 진단 표시용.
+      const looksLikeChip = true;
 
       const diag: FrameDiagnostics = {
         r: rgb.r,

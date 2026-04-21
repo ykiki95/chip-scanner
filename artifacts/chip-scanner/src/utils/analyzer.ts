@@ -36,8 +36,8 @@ export const NOT_RECOMMENDED_RANGE: RgbRange = {
 
 // 채널 허용 오차 — 인쇄/카메라 색상 편차 보정용
 // (프린터 잉크 농도 + 종이 흰점 + LED/형광등 + 카메라 WB 누적 오차를 고려)
-// 12 → 30 으로 확대: 인쇄본 테스트에서 신선/섭취가능/비권장이 정상 분류되도록.
-const CHANNEL_TOLERANCE = 30;
+// 데모/PoC 단계에서는 50까지 풀어 인쇄본도 분류되도록 한다.
+const CHANNEL_TOLERANCE = 50;
 
 // 지시계 유효성 검증: 가이드 박스 안 색상이 균일한지 확인 (변두리/배경 영향 최소화)
 const MAX_COLOR_STD = PREVIEW_MAX_COLOR_STD;
