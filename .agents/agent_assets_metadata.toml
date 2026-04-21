@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "Z7FjJdtNEu32NvIVpnlBM"
+uri = "file://exports/lotusbio_tti_demo.pptx"
+type = "slides"
+title = "Lotusbio TTI AI 스캐너 — 투자자 자료 (4p)"
