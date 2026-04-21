@@ -34,10 +34,19 @@ export const NOT_RECOMMENDED_RANGE: RgbRange = {
   b: [128, 155],
 };
 
-// 채널 허용 오차 — 인쇄/카메라 색상 편차 보정용
-// (프린터 잉크 농도 + 종이 흰점 + LED/형광등 + 카메라 WB 누적 오차를 고려)
-// 데모/PoC 단계에서는 50까지 풀어 인쇄본도 분류되도록 한다.
-const CHANNEL_TOLERANCE = 50;
+// B/R 비율 기반 분류 임계값 — 조명/카메라 화이트밸런스 변화에 강함.
+// 종이 빛 반사로 R/G/B가 같이 올라가도 비율은 보존된다.
+// 원본 9색 분석값:
+//   신선:    B/R = 1.00 ~ 1.47
+//   섭취가능: B/R = 1.78 ~ 2.00
+//   비권장:  B/R = 2.18 ~ 3.05
+// 인쇄/카메라 편차 ±0.10 여유로 경계 지정.
+const BR_RATIO_FRESH_MAX = 1.65; // 이하면 신선 후보
+const BR_RATIO_CONSUMABLE_MAX = 2.1; // 이하면 섭취 가능, 초과하면 비권장
+
+// 흰 종이 오인 방지: 최소 청 우세도. (B - R) 가 이 값 미만이면
+// 청색 칩이 아니라 무채색(흰 종이/조명)으로 간주.
+const MIN_BLUE_DOMINANCE = 6;
 
 // 지시계 유효성 검증: 가이드 박스 안 색상이 균일한지 확인 (변두리/배경 영향 최소화)
 const MAX_COLOR_STD = PREVIEW_MAX_COLOR_STD;
@@ -108,19 +117,6 @@ function inRange(v: number, range: [number, number], tol = 0): boolean {
   return v >= range[0] - tol && v <= range[1] + tol;
 }
 
-function rangeDistance(stats: RgbStats, range: RgbRange): number {
-  const dr = inRange(stats.r, range.r)
-    ? 0
-    : Math.min(Math.abs(stats.r - range.r[0]), Math.abs(stats.r - range.r[1]));
-  const dg = inRange(stats.g, range.g)
-    ? 0
-    : Math.min(Math.abs(stats.g - range.g[0]), Math.abs(stats.g - range.g[1]));
-  const db = inRange(stats.b, range.b)
-    ? 0
-    : Math.min(Math.abs(stats.b - range.b[0]), Math.abs(stats.b - range.b[1]));
-  return dr + dg + db;
-}
-
 function inRgbRange(stats: RgbStats, range: RgbRange, tol = 0): boolean {
   return (
     inRange(stats.r, range.r, tol) &&
@@ -147,7 +143,7 @@ export function classifyByRgb(stats: RgbStats): AnalysisResult {
       "균일한 단일 색상이 감지되지 않았습니다. 지시계를 가이드 박스 안에 정확히 맞춰 주세요.";
     confidence = 0.9;
   } else {
-    // 1차: 정확한 범위 매칭 (오차 없음)
+    // === 1차: 절대 RGB 정확 매칭 (오차 없음) ===
     if (inRgbRange(stats, FRESH_RANGE)) {
       label = "very_fresh";
       confidence = confidenceFromCenter(stats, FRESH_RANGE);
@@ -158,24 +154,33 @@ export function classifyByRgb(stats: RgbStats): AnalysisResult {
       label = "not_recommended";
       confidence = confidenceFromCenter(stats, NOT_RECOMMENDED_RANGE);
     } else {
-      // 2차: 허용 오차 내 가장 가까운 범위로 보정 (인쇄/카메라 색차 흡수)
-      const candidates: Array<{ label: PredictionLabel; range: RgbRange; d: number }> = [
-        { label: "very_fresh", range: FRESH_RANGE, d: rangeDistance(stats, FRESH_RANGE) },
-        { label: "consumable", range: CONSUMABLE_RANGE, d: rangeDistance(stats, CONSUMABLE_RANGE) },
-        { label: "not_recommended", range: NOT_RECOMMENDED_RANGE, d: rangeDistance(stats, NOT_RECOMMENDED_RANGE) },
-      ];
-      candidates.sort((a, b) => a.d - b.d);
-      const best = candidates[0];
-      if (
-        best.d <= CHANNEL_TOLERANCE * 4 &&
-        inRgbRange(stats, best.range, CHANNEL_TOLERANCE)
-      ) {
-        label = best.label;
-        // 경계 밖이라 신뢰도는 약간 낮춤
-        confidence = Math.max(0.7, confidenceFromCenter(stats, best.range) - 0.1);
-      } else {
+      // === 2차: B/R 비율 기반 분류 (조명·인쇄·카메라 WB 변화에 강함) ===
+      // 종이 위 빛 반사가 R·G·B를 함께 올려도 B/R 비율은 보존되므로
+      // 절대값 기반보다 훨씬 안정적이다.
+      const blueDominance = stats.b - stats.r;
+      const safeR = Math.max(1, stats.r);
+      const ratio = stats.b / safeR;
+
+      if (blueDominance < MIN_BLUE_DOMINANCE) {
+        // 청 우세가 거의 없음 → 흰 종이/조명 반사 또는 무채색 사물
         label = "unsupported";
-        confidence = Math.min(0.99, 0.7 + best.d / 250);
+        reasonOverride =
+          "청색 인디케이터가 감지되지 않았습니다. 지시계를 원 안에 맞춰 주세요.";
+        confidence = 0.85;
+      } else if (ratio <= BR_RATIO_FRESH_MAX) {
+        label = "very_fresh";
+        confidence = confidenceFromRatio(ratio, 1.0, BR_RATIO_FRESH_MAX);
+      } else if (ratio <= BR_RATIO_CONSUMABLE_MAX) {
+        label = "consumable";
+        confidence = confidenceFromRatio(
+          ratio,
+          BR_RATIO_FRESH_MAX,
+          BR_RATIO_CONSUMABLE_MAX,
+        );
+      } else {
+        label = "not_recommended";
+        // 비권장은 비율이 높을수록 확실 → 상한 3.2 기준
+        confidence = confidenceFromRatio(ratio, BR_RATIO_CONSUMABLE_MAX, 3.2);
       }
     }
   }
@@ -188,6 +193,18 @@ export function classifyByRgb(stats: RgbStats): AnalysisResult {
     confidence,
     rgb: stats,
   };
+}
+
+// 비율이 구간 중앙에 가까울수록 신뢰도 높음 (0.78 ~ 0.96)
+function confidenceFromRatio(
+  ratio: number,
+  lo: number,
+  hi: number,
+): number {
+  const center = (lo + hi) / 2;
+  const half = Math.max(0.001, (hi - lo) / 2);
+  const nd = Math.min(1, Math.abs(ratio - center) / half);
+  return Math.max(0.78, 0.96 - nd * 0.18);
 }
 
 function confidenceFromCenter(stats: RgbStats, range: RgbRange): number {

@@ -11,6 +11,8 @@ import {
   FRAME_INTERVAL_MS,
   PREVIEW_MAX_COLOR_STD,
   PREVIEW_MIN_SATURATION,
+  COLOR_STABILITY_FRAMES,
+  COLOR_STABILITY_MAX_DELTA,
 } from "@/utils/constants";
 import { computeQuality, computeMotion } from "@/utils/imageQuality";
 import { meanRgb } from "@/utils/analyzer";
@@ -40,12 +42,15 @@ interface Props {
   onCapture: (blob: Blob, diagnostics: FrameDiagnostics | null) => void;
   isAnalyzing: boolean;
   errorBanner?: string | null;
+  /** false 일 때 분석 루프를 일시중지 (스트림은 유지). 기본 true */
+  active?: boolean;
 }
 
 export default function CameraView({
   onCapture,
   isAnalyzing,
   errorBanner,
+  active = true,
 }: Props) {
   const {
     videoRef,
@@ -69,6 +74,20 @@ export default function CameraView({
   const lastFrameRef = useRef<ImageData | null>(null);
   const stableCountRef = useRef(0);
   const lockedRef = useRef(false);
+  // 색상 안정성: 최근 프레임의 평균 RGB를 모아 변동 폭을 본다
+  const recentColorsRef = useRef<Array<{ r: number; g: number; b: number }>>(
+    [],
+  );
+  // 외부에서 active 상태를 ref로 노출 (tick 클로저 안에서 최신값 참조)
+  const activeRef = useRef(active);
+  useEffect(() => {
+    activeRef.current = active;
+    if (!active) {
+      stableCountRef.current = 0;
+      recentColorsRef.current = [];
+      setStableProgress(0);
+    }
+  }, [active]);
   const [roiState, setRoiState] = useState<RoiState>("idle");
   const [statusText, setStatusText] = useState<string>(
     "칩을 가이드 영역 안에 맞춰 주세요",
@@ -96,6 +115,7 @@ export default function CameraView({
       setStableProgress(1);
     } else {
       stableCountRef.current = 0;
+      recentColorsRef.current = [];
       setStableProgress(0);
       setRoiState(status === "ready" ? "scanning" : "idle");
       if (status === "ready") {
@@ -125,7 +145,7 @@ export default function CameraView({
 
     const tick = async () => {
       if (cancelled) return;
-      if (lockedRef.current) {
+      if (lockedRef.current || !activeRef.current) {
         setTimeout(tick, FRAME_INTERVAL_MS);
         return;
       }
@@ -192,14 +212,33 @@ export default function CameraView({
         }
       }
 
-      // 칩 색상 유효성 (균일색만 검사 — 새 색상표는 거의 무채색에 가까운 칩도 포함)
+      // 칩 색상 유효성
       const rgb = meanRgb(imageData);
       const avgStd = (rgb.stdR + rgb.stdG + rgb.stdB) / 3;
       const uniformOk = avgStd <= PREVIEW_MAX_COLOR_STD;
       const saturationOk = rgb.saturation >= PREVIEW_MIN_SATURATION;
-      // PoC/데모 단계: 미리보기 단계 차단을 제거 — 밝기/선명도/안정성만 보고
-      // 무조건 캡처하여 분류 결과를 화면에 띄운다. 균일색·채도는 진단 표시용.
-      const looksLikeChip = true;
+
+      // === 색상 안정성: 최근 N프레임 평균 RGB의 변동 폭 ===
+      // 칩이 원 안에 들어오기 전엔 카메라가 다른 색을 보고 있어 RGB가 흔들린다.
+      // 정렬되어 칩 색만 보일 때 RGB가 평탄해진다.
+      const recent = recentColorsRef.current;
+      recent.push({ r: rgb.r, g: rgb.g, b: rgb.b });
+      if (recent.length > COLOR_STABILITY_FRAMES) recent.shift();
+      let colorStable = false;
+      if (recent.length >= COLOR_STABILITY_FRAMES) {
+        const minR = Math.min(...recent.map((c) => c.r));
+        const maxR = Math.max(...recent.map((c) => c.r));
+        const minG = Math.min(...recent.map((c) => c.g));
+        const maxG = Math.max(...recent.map((c) => c.g));
+        const minB = Math.min(...recent.map((c) => c.b));
+        const maxB = Math.max(...recent.map((c) => c.b));
+        const maxDelta = Math.max(maxR - minR, maxG - minG, maxB - minB);
+        colorStable = maxDelta <= COLOR_STABILITY_MAX_DELTA;
+      }
+
+      // 균일한 단일색 + 색상이 평탄히 유지되어야 칩으로 인정.
+      // (채도는 신선 칩이 거의 흰색에 가까워서 조건에서 제외)
+      const looksLikeChip = uniformOk && colorStable;
 
       const diag: FrameDiagnostics = {
         r: rgb.r,
@@ -238,10 +277,15 @@ export default function CameraView({
         setRoiState("scanning");
         setStatusText("칩을 확인하는 중입니다");
         resetStable();
-      } else if (!looksLikeChip) {
-        // 칩이 아닌 일반 사물로 판단 → 카운트 시작 안 함
+      } else if (!uniformOk) {
+        // 단일 색이 아님 → 칩이 원 안에 안 들어왔거나 잡색 사물
         setRoiState("scanning");
-        setStatusText("칩이 인식되지 않습니다");
+        setStatusText("원 안에 칩을 정확히 맞춰 주세요");
+        resetStable();
+      } else if (!colorStable) {
+        // 색상이 흔들림 → 정렬 중
+        setRoiState("scanning");
+        setStatusText("칩을 정렬 중입니다... 잠시만 유지해 주세요");
         resetStable();
       } else {
         stableCountRef.current += 1;

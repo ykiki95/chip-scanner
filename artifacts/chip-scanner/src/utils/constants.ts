@@ -46,8 +46,13 @@ export const MIN_BRIGHTNESS = 50; // 0~255
 export const MAX_BRIGHTNESS = 230;
 export const MIN_SHARPNESS = 12; // Laplacian variance proxy
 export const MAX_MOTION = 14; // 평균 픽셀 차이
-export const STABLE_FRAMES_REQUIRED = 6; // 약 1초 (간격 약 160ms)
+export const STABLE_FRAMES_REQUIRED = 12; // 약 2초 (간격 약 160ms) — 사용자가 침착히 정렬할 시간 확보
 export const FRAME_INTERVAL_MS = 160;
+// 색상 안정성: 최근 N프레임 평균 RGB의 채널별 변동 폭이 이 값 이하여야
+// "칩이 원 안에 안정적으로 들어왔다" 로 간주. 손떨림·움직임 추적과 별개로
+// 색상 자체가 흔들리지 않는지 확인.
+export const COLOR_STABILITY_FRAMES = 4;
+export const COLOR_STABILITY_MAX_DELTA = 14;
 
 // 칩(지시계) 인식 조건 — 실시간 미리보기와 분석에서 공유
 // 단일색 표준편차: 값이 낮을수록 균일한 색. 일반 사물(병, 종이 등)이

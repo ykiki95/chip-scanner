@@ -116,22 +116,35 @@ export default function Scanner() {
     );
   }
 
-  if (phase === "result" && result) {
-    return (
-      <ResultView
-        result={result}
-        measurement={measurement}
-        onRetry={handleRetry}
-        onExit={handleExit}
-      />
-    );
-  }
-
+  // 카메라는 항상 마운트해 둬서 결과 화면 → 다시 스캔 시 권한 재요청을
+  // 일으키지 않는다. 결과 화면은 카메라 위에 오버레이.
   return (
-    <CameraView
-      onCapture={handleCapture}
-      isAnalyzing={isAnalyzing}
-      errorBanner={errorBanner}
-    />
+    <div className="relative w-full h-full">
+      <div
+        className={
+          phase === "result" && result
+            ? "absolute inset-0 invisible pointer-events-none"
+            : "absolute inset-0"
+        }
+        aria-hidden={phase === "result" && !!result}
+      >
+        <CameraView
+          active={phase === "camera"}
+          onCapture={handleCapture}
+          isAnalyzing={isAnalyzing}
+          errorBanner={errorBanner}
+        />
+      </div>
+      {phase === "result" && result && (
+        <div className="absolute inset-0 z-10">
+          <ResultView
+            result={result}
+            measurement={measurement}
+            onRetry={handleRetry}
+            onExit={handleExit}
+          />
+        </div>
+      )}
+    </div>
   );
 }
