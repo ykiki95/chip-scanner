@@ -32,7 +32,7 @@ pres.layout = "LAYOUT_WIDE"; // 13.333 x 7.5
 pres.title = "Lotusbio TTI AI 품질 스캐너 — 투자자 자료";
 pres.author = "Lotusbio";
 
-const TOTAL_PAGES = 5;
+const TOTAL_PAGES = 6;
 
 const W = 13.333;
 const H = 7.5;
@@ -895,6 +895,114 @@ function arrow(slide, x, y, w) {
   s.addText("100% 보장형 의료/안전 인증 도구가 아닌 \"보조 판정 도구\"로 포지셔닝 — 식약처 식품 보조표시 가이드라인 준용", {
     x: tgtX, y: botY + 1.62, w: 5.8, h: 0.32,
     fontFace: FONT, fontSize: 9, italic: true, color: COLOR.textMute,
+  });
+}
+
+// ============================================================
+// SLIDE 6 — 영문 약어 / 용어 설명집
+// ============================================================
+{
+  const s = pres.addSlide();
+  s.background = { color: COLOR.white };
+  addHeader(s, 6);
+  title(s, "용어 · 약어 설명",
+    "본 자료에 사용된 주요 기술 용어 정리");
+
+  // 4개 카테고리 × 카테고리별 용어 카드
+  const sections = [
+    {
+      title: "AI · Model",
+      color: COLOR.primary,
+      items: [
+        ["CNN", "Convolutional Neural Network — 이미지 인식의 표준 신경망 구조"],
+        ["YOLO", "You Only Look Once — 실시간 객체 검출 모델 (위치·크기 한 번에 예측)"],
+        ["ResNet / EfficientFormer / MobileViT", "이미지 분류용 딥러닝 백본 모델 (점점 가볍고 정확해진 세대별 진화)"],
+        ["MobileNet", "Google이 만든 모바일용 경량 CNN, 16MB 수준"],
+        ["LLM", "Large Language Model — GPT-4V, Gemini 등 대형 멀티모달 모델"],
+      ],
+    },
+    {
+      title: "Training · Deployment",
+      color: COLOR.accent,
+      items: [
+        ["ImageNet", "1,400만 장 사진 데이터셋 — 대부분의 비전 모델 사전학습 표준"],
+        ["Fine-tuning", "사전학습 모델을 자사 데이터로 추가 학습하여 도메인에 적응시키는 기법"],
+        ["Quantization (int8)", "32-bit 모델을 8-bit로 압축 → 모델 크기 1/4, 속도 2~4배 향상"],
+        ["Active Learning", "사용자 데이터에서 어려운 샘플만 골라 재학습하는 효율적 학습 사이클"],
+        ["OTA", "Over-the-Air — 앱 업데이트 없이 모델 파일만 무선 배포"],
+      ],
+    },
+    {
+      title: "Vision · Camera",
+      color: COLOR.success,
+      items: [
+        ["TTI", "Time-Temperature Indicator — 온도·시간에 따라 색이 변하는 식품 신선도 칩"],
+        ["ROI", "Region of Interest — 분석 대상 영역 (앱의 점선 원 안쪽)"],
+        ["WB", "White Balance — 광원에 따라 달라지는 색감을 보정"],
+        ["Perspective Correction", "비스듬히 찍힌 칩을 정원으로 펴는 원근 보정"],
+        ["OpenCV", "오픈소스 컴퓨터비전 라이브러리 — 모바일 영상 전처리 표준"],
+      ],
+    },
+    {
+      title: "Platform · App",
+      color: COLOR.warn,
+      items: [
+        ["PoC", "Proof of Concept — 기술 개념 검증용 시제품 (현재 데모)"],
+        ["PWA", "Progressive Web App — 설치 가능한 웹 기반 앱"],
+        ["TFJS / TFLite / Core ML", "TensorFlow.js (브라우저) / TensorFlow Lite (Android) / Core ML (iOS) 추론 엔진"],
+        ["Camera2 / AVFoundation", "Android · iOS의 카메라 정밀 제어 공식 API"],
+        ["SDK", "Software Development Kit — 외부 개발자가 쓸 수 있게 만든 기능 묶음"],
+      ],
+    },
+  ];
+
+  // 2x2 그리드
+  const gridX = 0.5;
+  const gridY = 1.85;
+  const gridW = (W - 1.0 - 0.3) / 2;   // 0.3 gap between columns
+  const gridH = (H - gridY - 0.6 - 0.2) / 2; // 0.2 gap between rows
+  const colGap = 0.3;
+  const rowGap = 0.2;
+
+  sections.forEach((sec, idx) => {
+    const col = idx % 2;
+    const row = Math.floor(idx / 2);
+    const x = gridX + col * (gridW + colGap);
+    const y = gridY + row * (gridH + rowGap);
+
+    // 카드 배경
+    s.addShape("roundRect", {
+      x, y, w: gridW, h: gridH,
+      rectRadius: 0.1,
+      fill: { color: COLOR.white },
+      line: { color: COLOR.line, width: 0.75 },
+    });
+    // 좌측 색 띠
+    s.addShape("rect", {
+      x, y, w: 0.12, h: gridH,
+      fill: { color: sec.color }, line: { color: sec.color },
+    });
+    // 카테고리 헤더
+    s.addText(sec.title, {
+      x: x + 0.3, y: y + 0.15, w: gridW - 0.4, h: 0.32,
+      fontFace: FONT_BOLD, fontSize: 13, bold: true, color: sec.color, charSpacing: 1,
+    });
+    // 항목
+    const itemY = y + 0.55;
+    const itemH = (gridH - 0.7) / sec.items.length;
+    sec.items.forEach((it, j) => {
+      const iy = itemY + j * itemH;
+      // 약어 (좌)
+      s.addText(it[0], {
+        x: x + 0.3, y: iy, w: 2.6, h: itemH - 0.02,
+        fontFace: FONT_BOLD, fontSize: 10, bold: true, color: COLOR.textDark, valign: "top",
+      });
+      // 설명 (우)
+      s.addText(it[1], {
+        x: x + 2.95, y: iy, w: gridW - 3.1, h: itemH - 0.02,
+        fontFace: FONT, fontSize: 9, color: COLOR.textMute, valign: "top",
+      });
+    });
   });
 }
 
